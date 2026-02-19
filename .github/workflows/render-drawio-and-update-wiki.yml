@@ -22,7 +22,6 @@ jobs:
         with:
           node-version: "20"
 
-      # Убираем протухшие npm токены, если где-то есть .npmrc
       - name: Reset npm auth (defensive)
         run: |
           rm -f .npmrc || true
@@ -58,21 +57,61 @@ jobs:
             echo "No PNG changes to commit"
           else
             git commit -m "Auto-render drawio PNG"
-            # Явно указываем ветку, чтобы не зависеть от текущего HEAD
             git push origin HEAD
           fi
+
+      - name: Write wiki updater script
+        run: |
+          cat > /tmp/update_wiki.py << 'PYEOF'
+          import os, re, pathlib, sys
+          from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+
+          repo_full = os.environ["REPO_FULL"]
+          branch    = os.environ.get("BRANCH", "main")
+          v         = os.environ["V"][:7]
+
+          png_list = [x for x in os.environ["PNG_LIST"].strip().splitlines() if x]
+
+          base = f"https://raw.githubusercontent.com/{repo_full}/{branch}/docs/diagrams/"
+
+          md_files = list(pathlib.Path(".").rglob("*.md"))
+          if not md_files:
+              print("No .md pages found in wiki repo")
+              sys.exit(0)
+
+          def normalize_url(url: str) -> str:
+              parsed = urlparse(url)
+              params = parse_qs(parsed.query, keep_blank_values=True)
+              params["raw"] = ["1"]
+              params["v"]   = [v]
+              new_query = urlencode({k: val[0] for k, val in params.items()})
+              return urlunparse(parsed._replace(query=new_query))
+
+          changed_pages = 0
+
+          for p in md_files:
+              text = p.read_text(encoding="utf-8")
+              orig = text
+              for fn in png_list:
+                  pattern = re.escape(base + fn) + r"[^\s)\]]*"
+                  text = re.sub(pattern, lambda m: normalize_url(m.group(0)), text)
+              if text != orig:
+                  p.write_text(text, encoding="utf-8")
+                  changed_pages += 1
+                  print(f"Updated: {p}")
+
+          print(f"Pages changed: {changed_pages}")
+          PYEOF
 
       - name: Update all Wiki pages cache-busters for diagrams
         env:
           WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
-          # Используем встроенную переменную вместо хардкода — работает при fork/переименовании
           REPO_FULL: ${{ github.repository }}
           BRANCH: main
           V: ${{ github.sha }}
         run: |
           set -e
 
-          # Рекурсивный поиск PNG (без -maxdepth) — согласован с рекурсивным экспортом
           PNG_LIST="$(find docs/diagrams -type f -name "*.png" -printf "%f\n" || true)"
           export PNG_LIST
 
@@ -81,60 +120,11 @@ jobs:
             exit 0
           fi
 
-          # Клонируем без токена в URL, потом выставляем remote — токен не попадёт в git-лог
           git clone "https://github.com/${REPO_FULL}.wiki.git" wiki
           cd wiki
           git remote set-url origin "https://x-access-token:${WIKI_TOKEN}@github.com/${REPO_FULL}.wiki.git"
 
-          python3 - << 'PY'
-import os, re, pathlib, sys
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
-
-repo_full = os.environ["REPO_FULL"]
-branch    = os.environ.get("BRANCH", "main")
-v         = os.environ["V"][:7]
-
-# Фильтруем пустые строки на случай лишних переносов
-png_list = [x for x in os.environ["PNG_LIST"].strip().splitlines() if x]
-
-base = f"https://raw.githubusercontent.com/{repo_full}/{branch}/docs/diagrams/"
-
-md_files = list(pathlib.Path(".").rglob("*.md"))
-if not md_files:
-    print("No .md pages found in wiki repo")
-    sys.exit(0)
-
-def normalize_url(url: str) -> str:
-    """Гарантирует raw=1 и актуальный v= в URL диаграммы."""
-    parsed = urlparse(url)
-    params = parse_qs(parsed.query, keep_blank_values=True)
-
-    # Гарантируем raw=1
-    params["raw"] = ["1"]
-    # Обновляем cache-buster
-    params["v"] = [v]
-
-    new_query = urlencode({k: val[0] for k, val in params.items()})
-    return urlunparse(parsed._replace(query=new_query))
-
-changed_pages = 0
-
-for p in md_files:
-    text = p.read_text(encoding="utf-8")
-    orig = text
-
-    for fn in png_list:
-        pattern = re.escape(base + fn) + r"[^\s)\]]*"
-        text = re.sub(pattern, lambda m: normalize_url(m.group(0)), text)
-
-    if text != orig:
-        p.write_text(text, encoding="utf-8")
-        changed_pages += 1
-        print(f"Updated: {p}")
-
-print(f"Pages changed: {changed_pages}")
-PY
-        shell: bash
+          python3 /tmp/update_wiki.py
 
       - name: Commit & push Wiki updates
         env:
