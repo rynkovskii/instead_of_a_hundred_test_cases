@@ -105,7 +105,7 @@ jobs:
 
       - name: Update all Wiki pages cache-busters for diagrams
         env:
-          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+          WIKI_TOKEN: ${{ secrets.RYNKO_WIKI_TOKEN }}
           REPO_FULL: ${{ github.repository }}
           BRANCH: main
           V: ${{ github.sha }}
@@ -128,7 +128,7 @@ jobs:
 
       - name: Commit & push Wiki updates
         env:
-          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+          WIKI_TOKEN: ${{ secrets.RYNKO_WIKI_TOKEN }}
           REPO_FULL: ${{ github.repository }}
         run: |
           set -e
