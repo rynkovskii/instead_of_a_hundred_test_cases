@@ -3,32 +3,36 @@ name: render-drawio
 on:
   push:
     paths:
-      - "**.drawio"
+      - "docs/diagrams/**/*.drawio"
+
+permissions:
+  contents: write
 
 jobs:
   render:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: install drawio exporter
+      - name: Install drawio (diagrams.net desktop)
         run: |
-          sudo apt update
-          sudo apt install xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils wget -y
-          wget https://github.com/jgraph/drawio-desktop/releases/download/v22.1.0/drawio-amd64-22.1.0.deb
-          sudo apt install ./drawio-amd64-22.1.0.deb -y
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils wget
+          wget -O drawio.deb https://github.com/jgraph/drawio-desktop/releases/latest/download/drawio-amd64.deb
+          sudo apt-get install -y ./drawio.deb
 
-      - name: export diagrams
+      - name: Export PNGs
         run: |
-          for f in $(find . -name "*.drawio"); do
-            drawio --export --format svg --output "${f%.drawio}.svg" "$f"
+          shopt -s globstar nullglob
+          for f in docs/diagrams/**/*.drawio; do
+            echo "Exporting $f"
+            drawio --export --format png --output "${f%.drawio}.png" "$f"
           done
 
-      - name: commit svgs
+      - name: Commit updated images
         run: |
-          git config user.name github-actions
-          git config user.email actions@github.com
-          git add **/*.svg
-          git commit -m "auto render diagrams" || echo "no changes"
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add docs/diagrams/**/*.png
+          git commit -m "Auto-render drawio PNG" || echo "No changes to commit"
           git push
