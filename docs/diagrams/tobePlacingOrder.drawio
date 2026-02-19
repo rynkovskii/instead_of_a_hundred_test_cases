@@ -209,6 +209,12 @@
             <mxPoint x="2050" y="190" as="targetPoint" />
           </mxGeometry>
         </mxCell>
+        <mxCell id="hwwH7sTUy8IfROMfHRM1-9" parent="dNxyNK7c78bLwvsdeMH5-20" style="shape=xor;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="80" width="60" x="1250" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="hwwH7sTUy8IfROMfHRM1-10" parent="dNxyNK7c78bLwvsdeMH5-20" style="ellipse;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="80" width="120" x="1410" y="260" as="geometry" />
+        </mxCell>
         <mxCell id="dNxyNK7c78bLwvsdeMH5-21" parent="dNxyNK7c78bLwvsdeMH5-19" style="swimlane;html=1;startSize=20;horizontal=0;" value="Payment Provider" vertex="1">
           <mxGeometry height="130" width="2140" x="20" y="400" as="geometry" />
         </mxCell>
