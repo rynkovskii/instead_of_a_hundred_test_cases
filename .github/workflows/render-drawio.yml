@@ -19,14 +19,21 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install drawio exporter (CLI)
-        run: npm i -g @jgraph/drawio-export
+      # чтобы не мешал “протухший токен”, если где-то есть .npmrc
+      - name: Reset npm auth
+        run: |
+          rm -f .npmrc || true
+          rm -f ~/.npmrc || true
+          npm config delete //registry.npmjs.org/:_authToken || true
+
+      - name: Install draw.io exporter (CLI)
+        run: npm i -g draw.io-export
 
       - name: Export PNGs
         run: |
           for f in $(find docs/diagrams -name "*.drawio"); do
             echo "Exporting $f"
-            drawio-export "$f" "${f%.drawio}.png"
+            drawio "$f" -o "${f%.drawio}.png"
           done
 
       - name: Commit updated images
