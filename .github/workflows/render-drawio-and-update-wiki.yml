@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   render_and_update_wiki:
@@ -21,14 +22,13 @@ jobs:
         with:
           node-version: "20"
 
-      # На всякий случай убираем протухшие npm токены, если где-то есть .npmrc
+      # Убираем протухшие npm токены, если где-то есть .npmrc
       - name: Reset npm auth (defensive)
         run: |
           rm -f .npmrc || true
           rm -f ~/.npmrc || true
           npm config delete //registry.npmjs.org/:_authToken || true
 
-      # CLI экспортёр (у тебя уже с ним получилось рендерить PNG)
       - name: Install drawio exporter (CLI)
         run: npm i -g draw.io-export
 
@@ -39,7 +39,6 @@ jobs:
           while IFS= read -r f; do
             found=1
             echo "Exporting: $f"
-            # Экспортируем PNG рядом с исходником
             drawio "$f" -o "${f%.drawio}.png"
           done < <(find docs/diagrams -name "*.drawio" -type f)
 
@@ -59,97 +58,90 @@ jobs:
             echo "No PNG changes to commit"
           else
             git commit -m "Auto-render drawio PNG"
-            git push
+            # Явно указываем ветку, чтобы не зависеть от текущего HEAD
+            git push origin HEAD
           fi
 
       - name: Update all Wiki pages cache-busters for diagrams
         env:
           WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
-          REPO_FULL: rynkovskii/instead_of_a_hundred_test_cases
+          # Используем встроенную переменную вместо хардкода — работает при fork/переименовании
+          REPO_FULL: ${{ github.repository }}
           BRANCH: main
+          V: ${{ github.sha }}
         run: |
           set -e
 
-          # Соберём список PNG, которые считаем "диаграммами" (все PNG из docs/diagrams)
-          PNG_LIST="$(find docs/diagrams -maxdepth 1 -type f -name "*.png" -printf "%f\n" || true)"
+          # Рекурсивный поиск PNG (без -maxdepth) — согласован с рекурсивным экспортом
+          PNG_LIST="$(find docs/diagrams -type f -name "*.png" -printf "%f\n" || true)"
+          export PNG_LIST
 
           if [ -z "$PNG_LIST" ]; then
             echo "No PNG files found in docs/diagrams - nothing to update in Wiki"
             exit 0
           fi
 
-          # Клонируем wiki repo
-          git clone "https://x-access-token:${WIKI_TOKEN}@github.com/${REPO_FULL}.wiki.git" wiki
+          # Клонируем без токена в URL, потом выставляем remote — токен не попадёт в git-лог
+          git clone "https://github.com/${REPO_FULL}.wiki.git" wiki
           cd wiki
+          git remote set-url origin "https://x-access-token:${WIKI_TOKEN}@github.com/${REPO_FULL}.wiki.git"
 
-          # Версия cache-buster: короткий SHA коммита, который триггернул workflow
-          V="${GITHUB_SHA::7}"
-
-          # Обновляем ВСЕ md-страницы (включая подпапки)
           python3 - << 'PY'
-          import os, re, pathlib, sys
+import os, re, pathlib, sys
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
-          repo_full = os.environ["REPO_FULL"]
-          branch = os.environ.get("BRANCH", "main")
-          v = os.environ["V"]
-          png_list = os.environ["PNG_LIST"].strip().splitlines()
+repo_full = os.environ["REPO_FULL"]
+branch    = os.environ.get("BRANCH", "main")
+v         = os.environ["V"][:7]
 
-          base = f"https://raw.githubusercontent.com/{repo_full}/{branch}/docs/diagrams/"
+# Фильтруем пустые строки на случай лишних переносов
+png_list = [x for x in os.environ["PNG_LIST"].strip().splitlines() if x]
 
-          md_files = list(pathlib.Path(".").rglob("*.md"))
-          if not md_files:
-            print("No .md pages found in wiki repo")
-            sys.exit(0)
+base = f"https://raw.githubusercontent.com/{repo_full}/{branch}/docs/diagrams/"
 
-          def normalize_url(url: str) -> str:
-            # гарантируем raw=1
-            if "?" not in url:
-              url = url + "?raw=1"
-            elif "raw=1" not in url:
-              url = url.replace("?", "?raw=1&", 1)
+md_files = list(pathlib.Path(".").rglob("*.md"))
+if not md_files:
+    print("No .md pages found in wiki repo")
+    sys.exit(0)
 
-            # обновляем/добавляем v=
-            if re.search(r"([?&]v=)", url):
-              url = re.sub(r"([?&]v=)[^&#)\s]+", r"\1" + v, url)
-            else:
-              url = url + "&v=" + v
-            return url
+def normalize_url(url: str) -> str:
+    """Гарантирует raw=1 и актуальный v= в URL диаграммы."""
+    parsed = urlparse(url)
+    params = parse_qs(parsed.query, keep_blank_values=True)
 
-          changed_pages = 0
+    # Гарантируем raw=1
+    params["raw"] = ["1"]
+    # Обновляем cache-buster
+    params["v"] = [v]
 
-          for p in md_files:
-            text = p.read_text(encoding="utf-8")
-            orig = text
+    new_query = urlencode({k: val[0] for k, val in params.items()})
+    return urlunparse(parsed._replace(query=new_query))
 
-            for fn in png_list:
-              # Находим любые вхождения raw-url на этот png (с параметрами или без)
-              # Пример: https://raw.githubusercontent.com/.../tobePlacingOrder.png
-              #         https://raw.githubusercontent.com/.../tobePlacingOrder.png?raw=1&v=...
-              pattern = re.escape(base + fn) + r"[^\s)\]]*"
+changed_pages = 0
 
-              def repl(m):
-                return normalize_url(m.group(0))
+for p in md_files:
+    text = p.read_text(encoding="utf-8")
+    orig = text
 
-              text = re.sub(pattern, repl, text)
+    for fn in png_list:
+        pattern = re.escape(base + fn) + r"[^\s)\]]*"
+        text = re.sub(pattern, lambda m: normalize_url(m.group(0)), text)
 
-            if text != orig:
-              p.write_text(text, encoding="utf-8")
-              changed_pages += 1
-              print(f"Updated: {p}")
+    if text != orig:
+        p.write_text(text, encoding="utf-8")
+        changed_pages += 1
+        print(f"Updated: {p}")
 
-          print(f"Pages changed: {changed_pages}")
-          PY
+print(f"Pages changed: {changed_pages}")
+PY
         shell: bash
-        env:
-          PNG_LIST: ${{ env.PNG_LIST }}
-          V: ${{ github.sha }}
 
       - name: Commit & push Wiki updates
         env:
           WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
         run: |
           set -e
-          cd wiki
+          cd "$GITHUB_WORKSPACE/wiki"
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
