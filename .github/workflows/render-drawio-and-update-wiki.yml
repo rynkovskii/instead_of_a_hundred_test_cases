@@ -69,7 +69,7 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
-          git add docs/diagrams/**/*.png docs/diagrams/*.png || true
+          find docs/diagrams -name "*.png" -type f -exec git add {} +
 
           if git diff --cached --quiet; then
             echo "No PNG changes to commit"
