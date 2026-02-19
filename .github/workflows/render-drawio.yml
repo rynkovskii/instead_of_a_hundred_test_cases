@@ -14,25 +14,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install drawio (diagrams.net desktop)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils wget
-          wget -O drawio.deb https://github.com/jgraph/drawio-desktop/releases/latest/download/drawio-amd64.deb
-          sudo apt-get install -y ./drawio.deb
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install drawio exporter (CLI)
+        run: npm i -g @jgraph/drawio-export
 
       - name: Export PNGs
         run: |
-          shopt -s globstar nullglob
-          for f in docs/diagrams/**/*.drawio; do
+          for f in $(find docs/diagrams -name "*.drawio"); do
             echo "Exporting $f"
-            drawio --export --format png --output "${f%.drawio}.png" "$f"
+            drawio-export "$f" "${f%.drawio}.png"
           done
 
       - name: Commit updated images
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add docs/diagrams/**/*.png
-          git commit -m "Auto-render drawio PNG" || echo "No changes to commit"
+          git add docs/diagrams/*.png
+          git commit -m "Auto-render drawio PNG" || echo "No changes"
           git push
