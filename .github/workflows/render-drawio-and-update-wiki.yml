@@ -28,8 +28,11 @@ jobs:
           rm -f ~/.npmrc || true
           npm config delete //registry.npmjs.org/:_authToken || true
 
-      - name: Install drawio exporter (CLI)
-        run: npm i -g draw.io-export
+      - name: Install dependencies for headless rendering
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y xvfb libgbm-dev libasound2t64
+          npm i -g draw.io-export
 
       - name: Export PNGs from drawio
         run: |
@@ -38,7 +41,8 @@ jobs:
           while IFS= read -r f; do
             found=1
             echo "Exporting: $f"
-            drawio "$f" -o "${f%.drawio}.png"
+            xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" \
+              drawio "$f" -o "${f%.drawio}.png"
           done < <(find docs/diagrams -name "*.drawio" -type f)
 
           if [ "$found" -eq 0 ]; then
@@ -105,7 +109,7 @@ jobs:
 
       - name: Update all Wiki pages cache-busters for diagrams
         env:
-          WIKI_TOKEN: ${{ secrets.RYNKO_WIKI_TOKEN }}
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
           REPO_FULL: ${{ github.repository }}
           BRANCH: main
           V: ${{ github.sha }}
@@ -128,7 +132,7 @@ jobs:
 
       - name: Commit & push Wiki updates
         env:
-          WIKI_TOKEN: ${{ secrets.RYNKO_WIKI_TOKEN }}
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
           REPO_FULL: ${{ github.repository }}
         run: |
           set -e
@@ -136,7 +140,6 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
-          # Явно выставляем remote с токеном — каждый шаг независимый процесс
           git remote set-url origin "https://x-access-token:${WIKI_TOKEN}@github.com/${REPO_FULL}.wiki.git"
 
           git add -A
