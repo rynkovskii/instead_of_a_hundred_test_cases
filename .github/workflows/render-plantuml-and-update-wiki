@@ -1,0 +1,171 @@
+name: Render plantuml + update Wiki images
+
+on:
+  push:
+    paths:
+      - "docs/diagrams/**/*.puml"
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: plantuml-render-${{ github.repository }}
+  cancel-in-progress: true
+
+jobs:
+  render_and_update_wiki:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Java (for PlantUML)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install PlantUML + Graphviz
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y plantuml graphviz
+
+      - name: Export PNGs from .puml
+        shell: bash
+        run: |
+          set -euo pipefail
+          found=0
+
+          while IFS= read -r f; do
+            found=1
+            out="${f%.puml}.png"
+            echo "Rendering: $f -> $out"
+
+            # plantuml сам пишет PNG рядом (по умолчанию) при -tpng
+            plantuml -tpng "$f"
+
+            # Явная проверка что PNG создан и не пустой
+            if [ ! -f "$out" ]; then
+              echo "ERROR: PNG not created: $out"
+              exit 1
+            fi
+            if [ ! -s "$out" ]; then
+              echo "ERROR: PNG is empty: $out"
+              exit 1
+            fi
+
+            echo "OK: $out ($(du -h "$out" | cut -f1))"
+          done < <(find docs/diagrams -name "*.puml" -type f)
+
+          if [ "$found" -eq 0 ]; then
+            echo "No .puml files found under docs/diagrams"
+          fi
+
+      - name: Commit updated PNGs to repo
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          find docs/diagrams -name "*.png" -type f -exec git add {} +
+
+          if git diff --cached --quiet; then
+            echo "No PNG changes to commit"
+          else
+            git commit -m "Auto-render PlantUML PNG [skip ci]"
+            git push origin HEAD
+          fi
+
+      - name: Write wiki updater script
+        run: |
+          cat > /tmp/update_wiki.py << 'PYEOF'
+          import os, re, pathlib, sys
+          from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+
+          repo_full = os.environ["REPO_FULL"]
+          branch    = os.environ.get("BRANCH", "main")
+          v         = os.environ["V"][:7]
+
+          png_list = [x for x in os.environ["PNG_LIST"].strip().splitlines() if x]
+
+          # base до папки diagrams; png_list содержит относительные пути внутри docs/diagrams
+          base = f"https://raw.githubusercontent.com/{repo_full}/{branch}/docs/diagrams/"
+
+          md_files = list(pathlib.Path(".").rglob("*.md"))
+          if not md_files:
+              print("No .md pages found in wiki repo")
+              sys.exit(0)
+
+          def normalize_url(url: str) -> str:
+              parsed = urlparse(url)
+              params = parse_qs(parsed.query, keep_blank_values=True)
+              params["raw"] = ["1"]
+              params["v"]   = [v]
+              new_query = urlencode({k: val[0] for k, val in params.items()})
+              return urlunparse(parsed._replace(query=new_query))
+
+          changed_pages = 0
+
+          for p in md_files:
+              text = p.read_text(encoding="utf-8")
+              orig = text
+              for fn in png_list:
+                  # заменяем URL именно на эту картинку (+ возможный query/fragment)
+                  pattern = re.escape(base + fn) + r"(?:\?[^\s)\]]*)?(?:#[^\s)\]]*)?"
+                  text = re.sub(pattern, lambda m: normalize_url(m.group(0)), text)
+              if text != orig:
+                  p.write_text(text, encoding="utf-8")
+                  changed_pages += 1
+                  print(f"Updated: {p}")
+
+          print(f"Pages changed: {changed_pages}")
+          PYEOF
+
+      - name: Update all Wiki pages cache-busters for diagrams
+        env:
+          WIKI_TOKEN: ${{ secrets.RYNKO_WIKI_TOKEN }}
+          REPO_FULL: ${{ github.repository }}
+          BRANCH: main
+          V: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # ВАЖНО: %P дает путь относительно docs/diagrams (подпапки поддерживаются)
+          PNG_LIST="$(find docs/diagrams -type f -name "*.png" -printf "%P\n" || true)"
+          export PNG_LIST
+
+          if [ -z "${PNG_LIST:-}" ]; then
+            echo "No PNG files found in docs/diagrams - nothing to update in Wiki"
+            exit 0
+          fi
+
+          git clone "https://github.com/${REPO_FULL}.wiki.git" wiki
+          cd wiki
+          git remote set-url origin "https://x-access-token:${WIKI_TOKEN}@github.com/${REPO_FULL}.wiki.git"
+
+          python3 /tmp/update_wiki.py
+
+      - name: Commit & push Wiki updates
+        env:
+          WIKI_TOKEN: ${{ secrets.RYNKO_WIKI_TOKEN }}
+          REPO_FULL: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/wiki"
+
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git remote set-url origin "https://x-access-token:${WIKI_TOKEN}@github.com/${REPO_FULL}.wiki.git"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No Wiki changes to commit"
+          else
+            git commit -m "Update diagram cache-busters"
+            git push
+          fi
