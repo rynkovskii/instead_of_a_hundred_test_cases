@@ -8,6 +8,4 @@ Alice <-- Bob: Another authentication Response
 
 Alice -> Bob: Authentication Request 2
 
-Alice -> Bob: Authentication Request 3
-
 @enduml
