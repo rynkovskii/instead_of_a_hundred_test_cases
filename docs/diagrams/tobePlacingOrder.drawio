@@ -209,20 +209,11 @@
             <mxPoint x="2050" y="190" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="hwwH7sTUy8IfROMfHRM1-9" parent="dNxyNK7c78bLwvsdeMH5-20" style="shape=xor;whiteSpace=wrap;html=1;" value="" vertex="1">
-          <mxGeometry height="80" width="60" x="1250" y="280" as="geometry" />
-        </mxCell>
-        <mxCell id="hwwH7sTUy8IfROMfHRM1-10" parent="dNxyNK7c78bLwvsdeMH5-20" style="ellipse;whiteSpace=wrap;html=1;" value="" vertex="1">
-          <mxGeometry height="80" width="120" x="1410" y="260" as="geometry" />
-        </mxCell>
         <mxCell id="dNxyNK7c78bLwvsdeMH5-21" parent="dNxyNK7c78bLwvsdeMH5-19" style="swimlane;html=1;startSize=20;horizontal=0;" value="Payment Provider" vertex="1">
           <mxGeometry height="130" width="2140" x="20" y="400" as="geometry" />
         </mxCell>
         <mxCell id="lh9X9kKznQcFK0Pcg-LH-49" parent="dNxyNK7c78bLwvsdeMH5-21" style="rhombus;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" value="Success?" vertex="1">
           <mxGeometry height="60" width="72.5" x="1623.75" y="35" as="geometry" />
-        </mxCell>
-        <mxCell id="hwwH7sTUy8IfROMfHRM1-8" parent="dNxyNK7c78bLwvsdeMH5-21" style="shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;" value="" vertex="1">
-          <mxGeometry height="80" width="120" x="995" y="25" as="geometry" />
         </mxCell>
         <mxCell id="lh9X9kKznQcFK0Pcg-LH-50" edge="1" parent="dNxyNK7c78bLwvsdeMH5-19" source="lh9X9kKznQcFK0Pcg-LH-45" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" target="lh9X9kKznQcFK0Pcg-LH-49">
           <mxGeometry relative="1" as="geometry" />
