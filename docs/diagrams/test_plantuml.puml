@@ -30,4 +30,6 @@ deactivate s1
 
 s1 <-- s2: Payment wasn't found
 
+s1 <-- s2: Payment wasn't found
+
 @enduml
