@@ -75,7 +75,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No PNG changes to commit"
           else
-            git commit -m "Auto-render PlantUML PNG [skip ci]"
+            git commit -m "Auto-render PlantUML PNG"
             git push origin HEAD
           fi
 
