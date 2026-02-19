@@ -1,0 +1,163 @@
+name: Render drawio + update Wiki images
+
+on:
+  push:
+    paths:
+      - "docs/diagrams/**/*.drawio"
+
+permissions:
+  contents: write
+
+jobs:
+  render_and_update_wiki:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # На всякий случай убираем протухшие npm токены, если где-то есть .npmrc
+      - name: Reset npm auth (defensive)
+        run: |
+          rm -f .npmrc || true
+          rm -f ~/.npmrc || true
+          npm config delete //registry.npmjs.org/:_authToken || true
+
+      # CLI экспортёр (у тебя уже с ним получилось рендерить PNG)
+      - name: Install drawio exporter (CLI)
+        run: npm i -g draw.io-export
+
+      - name: Export PNGs from drawio
+        run: |
+          set -e
+          found=0
+          while IFS= read -r f; do
+            found=1
+            echo "Exporting: $f"
+            # Экспортируем PNG рядом с исходником
+            drawio "$f" -o "${f%.drawio}.png"
+          done < <(find docs/diagrams -name "*.drawio" -type f)
+
+          if [ "$found" -eq 0 ]; then
+            echo "No .drawio files found under docs/diagrams"
+          fi
+
+      - name: Commit updated PNGs to repo
+        run: |
+          set -e
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add docs/diagrams/**/*.png docs/diagrams/*.png || true
+
+          if git diff --cached --quiet; then
+            echo "No PNG changes to commit"
+          else
+            git commit -m "Auto-render drawio PNG"
+            git push
+          fi
+
+      - name: Update all Wiki pages cache-busters for diagrams
+        env:
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+          REPO_FULL: rynkovskii/instead_of_a_hundred_test_cases
+          BRANCH: main
+        run: |
+          set -e
+
+          # Соберём список PNG, которые считаем "диаграммами" (все PNG из docs/diagrams)
+          PNG_LIST="$(find docs/diagrams -maxdepth 1 -type f -name "*.png" -printf "%f\n" || true)"
+
+          if [ -z "$PNG_LIST" ]; then
+            echo "No PNG files found in docs/diagrams - nothing to update in Wiki"
+            exit 0
+          fi
+
+          # Клонируем wiki repo
+          git clone "https://x-access-token:${WIKI_TOKEN}@github.com/${REPO_FULL}.wiki.git" wiki
+          cd wiki
+
+          # Версия cache-buster: короткий SHA коммита, который триггернул workflow
+          V="${GITHUB_SHA::7}"
+
+          # Обновляем ВСЕ md-страницы (включая подпапки)
+          python3 - << 'PY'
+          import os, re, pathlib, sys
+
+          repo_full = os.environ["REPO_FULL"]
+          branch = os.environ.get("BRANCH", "main")
+          v = os.environ["V"]
+          png_list = os.environ["PNG_LIST"].strip().splitlines()
+
+          base = f"https://raw.githubusercontent.com/{repo_full}/{branch}/docs/diagrams/"
+
+          md_files = list(pathlib.Path(".").rglob("*.md"))
+          if not md_files:
+            print("No .md pages found in wiki repo")
+            sys.exit(0)
+
+          def normalize_url(url: str) -> str:
+            # гарантируем raw=1
+            if "?" not in url:
+              url = url + "?raw=1"
+            elif "raw=1" not in url:
+              url = url.replace("?", "?raw=1&", 1)
+
+            # обновляем/добавляем v=
+            if re.search(r"([?&]v=)", url):
+              url = re.sub(r"([?&]v=)[^&#)\s]+", r"\1" + v, url)
+            else:
+              url = url + "&v=" + v
+            return url
+
+          changed_pages = 0
+
+          for p in md_files:
+            text = p.read_text(encoding="utf-8")
+            orig = text
+
+            for fn in png_list:
+              # Находим любые вхождения raw-url на этот png (с параметрами или без)
+              # Пример: https://raw.githubusercontent.com/.../tobePlacingOrder.png
+              #         https://raw.githubusercontent.com/.../tobePlacingOrder.png?raw=1&v=...
+              pattern = re.escape(base + fn) + r"[^\s)\]]*"
+
+              def repl(m):
+                return normalize_url(m.group(0))
+
+              text = re.sub(pattern, repl, text)
+
+            if text != orig:
+              p.write_text(text, encoding="utf-8")
+              changed_pages += 1
+              print(f"Updated: {p}")
+
+          print(f"Pages changed: {changed_pages}")
+          PY
+        shell: bash
+        env:
+          PNG_LIST: ${{ env.PNG_LIST }}
+          V: ${{ github.sha }}
+
+      - name: Commit & push Wiki updates
+        env:
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+        run: |
+          set -e
+          cd wiki
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No Wiki changes to commit"
+          else
+            git commit -m "Update diagram cache-busters"
+            git push
+          fi
