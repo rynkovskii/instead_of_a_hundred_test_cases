@@ -31,7 +31,13 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -y
-          sudo apt-get install -y plantuml graphviz
+          sudo apt-get install -y graphviz
+          PLANTUML_VERSION="1.2025.2"
+          curl -fsSL -o /usr/local/bin/plantuml.jar \
+            "https://github.com/plantuml/plantuml/releases/download/v${PLANTUML_VERSION}/plantuml-${PLANTUML_VERSION}.jar"
+          printf '#!/bin/sh\nexec java -jar /usr/local/bin/plantuml.jar "$@"\n' \
+            | sudo tee /usr/local/bin/plantuml > /dev/null
+          sudo chmod +x /usr/local/bin/plantuml
 
       - name: Export PNGs from .puml
         shell: bash
@@ -44,7 +50,9 @@ jobs:
             out="${f%.puml}.png"
             echo "Rendering: $f -> $out"
 
-            # plantuml сам пишет PNG рядом (по умолчанию) при -tpng
+            # Принудительно удаляем старый PNG перед рендером
+            rm -f "$out"
+
             plantuml -tpng "$f"
 
             # Явная проверка что PNG создан и не пустой
@@ -163,9 +171,6 @@ jobs:
 
           git add -A
 
-          if git diff --cached --quiet; then
-            echo "No Wiki changes to commit"
-          else
-            git commit -m "Update diagram cache-busters"
-            git push
-          fi
+          git diff --cached --quiet \
+            && echo "No Wiki changes to commit" \
+            || { git commit -m "Update diagram cache-busters" && git push; }
