@@ -209,9 +209,6 @@
             <mxPoint x="2050" y="190" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="SOw0zLyv6p2UWQVQn9Rd-2" parent="dNxyNK7c78bLwvsdeMH5-20" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d80073;strokeColor=#A50040;fontColor=#ffffff;" value="ваывавыаыв" vertex="1">
-          <mxGeometry height="80" width="120" x="1130" y="260" as="geometry" />
-        </mxCell>
         <mxCell id="SOw0zLyv6p2UWQVQn9Rd-4" parent="dNxyNK7c78bLwvsdeMH5-20" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d80073;strokeColor=#A50040;fontColor=#ffffff;" value="ваывавыаыв" vertex="1">
           <mxGeometry height="80" width="120" x="1210" y="320" as="geometry" />
         </mxCell>
@@ -244,12 +241,6 @@
           <mxGeometry relative="1" x="-0.6" as="geometry">
             <mxPoint as="offset" />
           </mxGeometry>
-        </mxCell>
-        <mxCell id="SOw0zLyv6p2UWQVQn9Rd-3" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d80073;strokeColor=#A50040;fontColor=#ffffff;" value="ваывавыаыв" vertex="1">
-          <mxGeometry height="80" width="120" x="1420" y="390" as="geometry" />
-        </mxCell>
-        <mxCell id="SOw0zLyv6p2UWQVQn9Rd-5" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d80073;strokeColor=#A50040;fontColor=#ffffff;" value="ваывавыаыв" vertex="1">
-          <mxGeometry height="80" width="120" x="1510" y="440" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
