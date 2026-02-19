@@ -209,9 +209,6 @@
             <mxPoint x="2050" y="190" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="SOw0zLyv6p2UWQVQn9Rd-4" parent="dNxyNK7c78bLwvsdeMH5-20" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d80073;strokeColor=#A50040;fontColor=#ffffff;" value="ваывавыаыв" vertex="1">
-          <mxGeometry height="80" width="120" x="1210" y="320" as="geometry" />
-        </mxCell>
         <mxCell id="dNxyNK7c78bLwvsdeMH5-21" parent="dNxyNK7c78bLwvsdeMH5-19" style="swimlane;html=1;startSize=20;horizontal=0;" value="Payment Provider" vertex="1">
           <mxGeometry height="130" width="2140" x="20" y="400" as="geometry" />
         </mxCell>
