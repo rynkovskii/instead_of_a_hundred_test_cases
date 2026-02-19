@@ -1,11 +1,31 @@
 @startuml
 
-Alice -> Bob: Authentication Request
-Bob --> Alice: Authentication Response
+hide footbox
+skinparam sequenceMessageAlign center
 
-Alice -> Bob: Another authentication Request
-Alice <-- Bob: Another authentication Response
+participant system1 as s1 #E1D5E7
+participant system2 as s2 #E1D5E7
+|||
 
-Alice -> Bob: Authentication Request 2
+activate s1 #F5F5F5
+s1 -> s2: Payment data request
+activate s2 #F5F5F5
+|||
+
+s2 -> s2: Verification
+activate s2 #DFDFDF
+deactivate s2
+
+s1 <-- s2: Payment data
+|||
+
+alt #FFF5F5 Error
+s1 <-- s2: Payment wasn't found
+deactivate s2
+|||
+end
+
+deactivate s1
+|||
 
 @enduml
