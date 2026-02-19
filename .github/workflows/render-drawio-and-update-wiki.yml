@@ -40,9 +40,23 @@ jobs:
           found=0
           while IFS= read -r f; do
             found=1
-            echo "Exporting: $f"
+            out="${f%.drawio}.png"
+            echo "Exporting: $f -> $out"
+
             xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" \
-              drawio "$f" -o "${f%.drawio}.png"
+              drawio "$f" -o "$out"
+
+            # Явная проверка что PNG создан и не пустой
+            if [ ! -f "$out" ]; then
+              echo "ERROR: PNG not created: $out"
+              exit 1
+            fi
+            if [ ! -s "$out" ]; then
+              echo "ERROR: PNG is empty: $out"
+              exit 1
+            fi
+
+            echo "OK: $out ($(du -h "$out" | cut -f1))"
           done < <(find docs/diagrams -name "*.drawio" -type f)
 
           if [ "$found" -eq 0 ]; then
