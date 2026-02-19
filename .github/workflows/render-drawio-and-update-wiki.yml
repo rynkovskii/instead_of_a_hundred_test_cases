@@ -129,11 +129,15 @@ jobs:
       - name: Commit & push Wiki updates
         env:
           WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+          REPO_FULL: ${{ github.repository }}
         run: |
           set -e
           cd "$GITHUB_WORKSPACE/wiki"
           git config user.name "github-actions"
           git config user.email "actions@github.com"
+
+          # Явно выставляем remote с токеном — каждый шаг независимый процесс
+          git remote set-url origin "https://x-access-token:${WIKI_TOKEN}@github.com/${REPO_FULL}.wiki.git"
 
           git add -A
 
